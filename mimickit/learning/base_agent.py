@@ -48,6 +48,10 @@ class BaseAgent(torch.nn.Module):
         self._mode = AgentMode.TRAIN
         self._curr_obs = None
         self._curr_info = None
+        
+        # Track previous values for per-iteration FPS calculation
+        self._prev_sample_count = 0
+        self._prev_wall_time = None
 
         return
 
@@ -253,6 +257,9 @@ class BaseAgent(torch.nn.Module):
         self._exp_buffer.clear()
         self._train_return_tracker.reset()
         self._test_return_tracker.reset()
+        # Reset FPS tracking for new training run
+        self._prev_sample_count = 0
+        self._prev_wall_time = None
         return
 
     def _train_iter(self):
@@ -261,20 +268,30 @@ class BaseAgent(torch.nn.Module):
         self.eval()
         self.set_mode(AgentMode.TRAIN)
 
+        # Time collection/rollout
+        collection_start = time.time()
         with torch.no_grad():
             self._rollout_train(self._steps_per_iter)
+        collection_time = time.time() - collection_start
         
         data_info = self._build_train_data()
+        
+        # Time backward pass/optimization
+        backward_start = time.time()
         train_info = self._update_model()
         
         if (self._need_normalizer_update()):
             self._update_normalizers()
+
+        backward_time = time.time() - backward_start
 
         info = {**train_info, **data_info}
         
         info["mean_return"] = self._train_return_tracker.get_mean_return().item()
         info["mean_ep_len"] = self._train_return_tracker.get_mean_ep_len().item()
         info["num_eps"] = self._train_return_tracker.get_episodes()
+        info["collection_time"] = collection_time
+        info["backward_time"] = backward_time
         
         return info
 
@@ -391,9 +408,25 @@ class BaseAgent(torch.nn.Module):
 
     def _log_train_info(self, train_info, test_info, env_diag_info, start_time):
         wall_time = (time.time() - start_time) / (60 * 60) # store time in hours
+        wall_time_seconds = (time.time() - start_time) # wall time in seconds
+        
+        # Calculate FPS for this iteration
+        if self._prev_wall_time is not None:
+            iter_time = wall_time_seconds - self._prev_wall_time
+            iter_samples = self._sample_count - self._prev_sample_count
+            total_fps = iter_samples / iter_time if iter_time > 0 else 0.0
+        else:
+            # First iteration: use total FPS
+            total_fps = self._sample_count / wall_time_seconds if wall_time_seconds > 0 else 0.0
+        
+        # Update previous values for next iteration
+        self._prev_sample_count = self._sample_count
+        self._prev_wall_time = wall_time_seconds
+        
         self._logger.log("Iteration", self._iter, collection="1_Info")
         self._logger.log("Wall_Time", wall_time, collection="1_Info")
         self._logger.log("Samples", self._sample_count, collection="1_Info")
+        self._logger.log("Total_FPS", total_fps, collection="1_Info")
         
         test_return = test_info["mean_return"]
         test_ep_len = test_info["mean_ep_len"]
@@ -417,7 +450,11 @@ class BaseAgent(torch.nn.Module):
             val_name = k.title()
             if torch.is_tensor(v):
                 v = v.item()
-            self._logger.log(val_name, v)
+            # Log timing metrics in Info collection
+            if k in ["collection_time", "backward_time"]:
+                self._logger.log(val_name, v, collection="1_Info")
+            else:
+                self._logger.log(val_name, v)
 
         for k, v in env_diag_info.items():
             val_name = k.title()

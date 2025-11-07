@@ -1,0 +1,9 @@
+--num_envs 4096
+
+--env_config data/envs/amp_steering_g1_env.yaml
+--agent_config data/agents/amp_task_g1_agent.yaml
+
+--log_file output/log.txt
+--logger wandb
+--out_model_file output/model.pt
+

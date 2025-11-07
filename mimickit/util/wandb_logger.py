@@ -42,6 +42,7 @@ class WandbLogger(logger.Logger):
         return
 
     def write_log(self):
+        print("Writing log")
         row_count = self._row_count
 
         super().write_log()
@@ -64,6 +65,7 @@ class WandbLogger(logger.Logger):
                     out_dict[tag] = val
 
             wandb.log(out_dict, step=int(step_val))
+            print("Logged to wandb")
 
         return
     
