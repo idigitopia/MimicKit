@@ -23,7 +23,7 @@ env:
     contact_bodies: ["left_knee_link", "left_ankle_pitch_link", "left_ankle_roll_link", "right_knee_link", "right_ankle_pitch_link", "right_ankle_roll_link"]
     
     rand_tar_dir: True
-    rand_face_dir: False
+    rand_face_dir: True
     tar_speed_min: 0.5
     tar_speed_max: 5.0
     tar_change_time_min: 4.0
