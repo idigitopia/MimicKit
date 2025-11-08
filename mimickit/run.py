@@ -104,7 +104,28 @@ def run(rank, num_procs, device, master_port, args):
     agent = build_agent(agent_file, env, device)
 
     if (model_file != ""):
-        agent.load(model_file)
+        Logger.print("=" * 60)
+        Logger.print("MODEL LOADING:")
+        Logger.print("  Model file path: {}".format(model_file))
+        Logger.print("  Absolute path: {}".format(os.path.abspath(model_file)))
+        if os.path.exists(model_file):
+            Logger.print("  File exists: YES")
+            Logger.print("  File size: {} bytes".format(os.path.getsize(model_file)))
+            Logger.print("  Attempting to load model...")
+            agent.load(model_file)
+            Logger.print("  Model loaded successfully!")
+        else:
+            Logger.print("  File exists: NO")
+            Logger.print("  ERROR: Model file not found!")
+            Logger.print("  Please check the path and ensure the model file exists.")
+            Logger.print("=" * 60)
+            raise FileNotFoundError("Model file not found: {}".format(model_file))
+        Logger.print("=" * 60)
+    else:
+        Logger.print("=" * 60)
+        Logger.print("MODEL LOADING:")
+        Logger.print("  No model_file specified. Using untrained model.")
+        Logger.print("=" * 60)
 
     if (mode == "train"):
         env_file = args.parse_string("env_config")

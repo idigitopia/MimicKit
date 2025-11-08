@@ -129,10 +129,21 @@ class BaseAgent(torch.nn.Module):
         return
 
     def load(self, in_file):
-        state_dict = torch.load(in_file, map_location=self._device)
-        self.load_state_dict(state_dict)
-        self._sync_optimizer()
-        Logger.print("Loaded model parameters from {:s}".format(in_file))
+        Logger.print("  Loading model from: {}".format(in_file))
+        try:
+            state_dict = torch.load(in_file, map_location=self._device)
+            Logger.print("  Model file loaded successfully. State dict keys: {}".format(len(state_dict.keys())))
+            self.load_state_dict(state_dict)
+            Logger.print("  State dict loaded into model.")
+            self._sync_optimizer()
+            Logger.print("  Optimizer synchronized.")
+            Logger.print("Loaded model parameters from {:s}".format(in_file))
+        except FileNotFoundError:
+            Logger.print("  ERROR: Model file not found: {}".format(in_file))
+            raise
+        except Exception as e:
+            Logger.print("  ERROR: Failed to load model: {}".format(str(e)))
+            raise
         return
 
     def calc_num_params(self):
