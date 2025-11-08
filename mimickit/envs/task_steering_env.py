@@ -113,47 +113,55 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         return
 
     def _update_marker(self, env_ids):
-        tar_dist_min = 1.0
-        tar_dist_max = 1.5
-
+        # Get character root position
         char_id = self._get_char_id()
-        tar_marker_id = self._get_tar_marker_id()
-        face_marker_id = self._get_face_marker_id()
-        
         root_pos = self._engine.get_root_pos(char_id)
         root_pos = root_pos[env_ids]
+        
+        # ========== VELOCITY MARKER (RED) ==========
+        # Calculate velocity-related values
+        velocity_to_distance_scale = 0.5  # 1 m/s velocity = 0.5 m distance
         tar_speed = self._tar_speed[env_ids]
         tar_dir = self._tar_dir[env_ids]
-        face_dir = self._face_dir[env_ids]
-
-        tar_dist = (tar_speed - self._tar_speed_min) / (self._tar_speed_max - self._tar_speed_min)
-        tar_dist = (tar_dist_max - tar_dist_min) * tar_dist + tar_dist_min
+        
+        # Make distance directly proportional to target velocity
+        tar_dist = tar_speed * velocity_to_distance_scale
         tar_dist = tar_dist.unsqueeze(-1)
-
-        marker_pos = root_pos.clone()
-        marker_pos[..., 0:2] += tar_dist * tar_dir
-        marker_pos[..., 2] = 0.0
-
+        
+        # Calculate velocity marker position and rotation
+        tar_marker_pos = root_pos.clone()
+        tar_marker_pos[..., 0:2] += tar_dist * tar_dir
+        tar_marker_pos[..., 2] = 0.0
+        
         tar_theta = torch.atan2(tar_dir[..., 1], tar_dir[..., 0])
         tar_axis = torch.zeros_like(root_pos)
         tar_axis[..., -1] = 1.0
-        marker_rot = torch_util.axis_angle_to_quat(tar_axis, tar_theta)
+        tar_marker_rot = torch_util.axis_angle_to_quat(tar_axis, tar_theta)
         
+        # Update velocity marker
+        tar_marker_id = self._get_tar_marker_id()
+        self._engine.set_root_pos(env_ids, tar_marker_id, tar_marker_pos)
+        self._engine.set_root_rot(env_ids, tar_marker_id, tar_marker_rot)
+        self._engine.set_root_vel(env_ids, tar_marker_id, 0.0)
+        self._engine.set_root_ang_vel(env_ids, tar_marker_id, 0.0)
+        
+        # ========== FACE MARKER (GREEN) ==========
+        # Calculate face-related values
+        face_dist = 1.0  # Fixed distance for face direction marker
+        face_dir = self._face_dir[env_ids]
+        
+        # Calculate face marker position and rotation
         face_marker_pos = root_pos.clone()
-        face_marker_pos[..., 0:2] += tar_dist_min * face_dir
+        face_marker_pos[..., 0:2] += face_dist * face_dir
         face_marker_pos[..., 2] = 0.01
-
+        
         face_theta = torch.atan2(face_dir[..., 1], face_dir[..., 0])
         face_axis = torch.zeros_like(root_pos)
         face_axis[..., -1] = 1.0
-        face_marker_rot = torch_util.axis_angle_to_quat(tar_axis, face_theta)
-
-
-        self._engine.set_root_pos(env_ids, tar_marker_id, marker_pos)
-        self._engine.set_root_rot(env_ids, tar_marker_id, marker_rot)
-        self._engine.set_root_vel(env_ids, tar_marker_id, 0.0)
-        self._engine.set_root_ang_vel(env_ids, tar_marker_id, 0.0)
-
+        face_marker_rot = torch_util.axis_angle_to_quat(face_axis, face_theta)
+        
+        # Update face marker
+        face_marker_id = self._get_face_marker_id()
         self._engine.set_root_pos(env_ids, face_marker_id, face_marker_pos)
         self._engine.set_root_rot(env_ids, face_marker_id, face_marker_rot)
         self._engine.set_root_vel(env_ids, face_marker_id, 0.0)
