@@ -3,6 +3,7 @@ import numpy as np
 
 import envs.amp_env as amp_env
 import util.torch_util as torch_util
+from util.logger import Logger
 
 
 class TaskSteeringEnv(amp_env.AMPEnv):
@@ -19,6 +20,14 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         self._reward_steering_face_w = float(env_config["reward_steering_face_w"])
 
         self._reward_steering_vel_scale = float(env_config["reward_steering_vel_scale"])
+
+        Logger.print("=" * 60)
+        Logger.print("STEERING TASK CONFIGURATION:")
+        Logger.print("  rand_tar_dir: {}".format(self._rand_tar_dir))
+        Logger.print("  rand_face_dir: {}".format(self._rand_face_dir))
+        Logger.print("  tar_speed_min: {}".format(self._tar_speed_min))
+        Logger.print("  tar_speed_max: {}".format(self._tar_speed_max))
+        Logger.print("=" * 60)
 
         super().__init__(config=config, num_envs=num_envs, device=device, visualize=visualize)
 
@@ -197,6 +206,14 @@ class TaskSteeringEnv(amp_env.AMPEnv):
         self._tar_dir[env_ids] = tar_dir
         self._face_dir[env_ids] = face_tar_dir
         self._tar_change_times[env_ids] = self._time_buf[env_ids] + rand_dt
+        
+        if len(env_ids) > 0 and env_ids[0] == 0:  # Only print for first env to avoid spam
+            Logger.print("RESET TASK - Env 0:")
+            Logger.print("  rand_tar_dir: {}, tar_dir: [{:.3f}, {:.3f}]".format(
+                self._rand_tar_dir, tar_dir[0, 0].item(), tar_dir[0, 1].item()))
+            Logger.print("  rand_face_dir: {}, face_dir: [{:.3f}, {:.3f}]".format(
+                self._rand_face_dir, face_tar_dir[0, 0].item(), face_tar_dir[0, 1].item()))
+            Logger.print("  tar_speed: {:.3f}".format(tar_speed[0].item()))
         
         if (self._visualize):
             self._update_marker(env_ids)
